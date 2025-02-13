@@ -78,10 +78,10 @@ public class AsyncTaskUtil implements AutoCloseable {
      * 提交任务
      *
      * @param task        任务
-     * @param maxAttempts 最大重试次数
+     * @param maxAttempts 最大重试次数，不需要重试请填写0
      */
     public void submitTask(Runnable task, int maxAttempts) {
-        config.countLatchUtil.countUp();
+        config.countLatchUtil.countUp();//任务开始前，计数器加一
         config.executor.submit(() -> {
             int attempts = 0;
             do {
@@ -93,7 +93,7 @@ public class AsyncTaskUtil implements AutoCloseable {
                     log.warn("[重试] 第 {} 次", attempts);
                 }
             } while (attempts < maxAttempts);
-            config.countLatchUtil.countDown();
+            config.countLatchUtil.countDown();//任务完成，计数器减一
         });
     }
 
