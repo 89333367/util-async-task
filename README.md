@@ -7,7 +7,8 @@
 <dependency>
     <groupId>sunyu.util</groupId>
     <artifactId>util-async-task</artifactId>
-    <version>1.0</version>
+    <!-- {util.version}_{jdk.version}_{architecture.version} -->
+    <version>1.0_jdk8_x64</version>
 </dependency>
 ```
 
