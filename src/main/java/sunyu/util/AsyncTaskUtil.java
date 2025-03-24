@@ -20,6 +20,10 @@ public class AsyncTaskUtil implements AutoCloseable {
     }
 
     private AsyncTaskUtil(Config config) {
+        log.info("[构建AsyncTaskUtil] 开始");
+        config.executor = Executors.newFixedThreadPool(config.maxConcurrency);
+        config.countLatchUtil = CountLatchUtil.builder().setMaxCount(config.maxConcurrency).build();
+        log.info("[构建AsyncTaskUtil] 结束");
         this.config = config;
     }
 
@@ -39,8 +43,6 @@ public class AsyncTaskUtil implements AutoCloseable {
          * @return 工具实例
          */
         public AsyncTaskUtil build() {
-            config.executor = Executors.newFixedThreadPool(config.maxConcurrency);
-            config.countLatchUtil = CountLatchUtil.builder().setMaxCount(config.maxConcurrency).build();
             return new AsyncTaskUtil(config);
         }
 
@@ -61,8 +63,10 @@ public class AsyncTaskUtil implements AutoCloseable {
      */
     @Override
     public void close() {
+        log.info("[销毁AsyncTaskUtil] 开始");
         awaitAllTasks();
         config.executor.shutdown();
+        log.info("[销毁AsyncTaskUtil] 结束");
     }
 
     /**
