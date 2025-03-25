@@ -1,10 +1,13 @@
 package sunyu.util;
 
+import cn.hutool.core.exceptions.ExceptionUtil;
+import cn.hutool.core.thread.ThreadUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 异步任务工具类
@@ -85,7 +88,19 @@ public class AsyncTaskUtil implements AutoCloseable {
      * @param maxAttempts 最大重试次数，不需要重试请填写0
      */
     public void submitTask(Runnable task, int maxAttempts) {
+        submitTask(task, maxAttempts, 1000);
+    }
+
+    /**
+     * 提交任务
+     *
+     * @param task        任务
+     * @param maxAttempts 最大重试次数，不需要重试请填写0
+     * @param sleepMillis 每次重试间隔毫秒数
+     */
+    public void submitTask(Runnable task, int maxAttempts, int sleepMillis) {
         config.countLatchUtil.countUp();//任务开始前，计数器加一
+        AtomicReference<String> err = new AtomicReference<>();
         config.executor.submit(() -> {
             int attempts = 0;
             do {
@@ -93,11 +108,18 @@ public class AsyncTaskUtil implements AutoCloseable {
                     task.run();
                     break;
                 } catch (Exception e) {
+                    err.set(ExceptionUtil.stacktraceToString(e));
                     attempts++;
                     log.warn("[重试] 第 {} 次", attempts);
+                    if (maxAttempts > 0) {
+                        ThreadUtil.sleep(sleepMillis);
+                    }
                 }
             } while (attempts < maxAttempts);
             config.countLatchUtil.countDown();//任务完成，计数器减一
+            if (err.get() != null) {
+                log.error("[任务执行失败] {}", err.get());
+            }
         });
     }
 
