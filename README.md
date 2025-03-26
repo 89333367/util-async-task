@@ -12,6 +12,33 @@
 </dependency>
 ```
 
+# 接口
+```java
+/**
+ * 提交任务
+ *
+ * @param task
+ */
+public void submitTask(Runnable task)
+
+/**
+ * 提交任务
+ *
+ * @param task        任务
+ * @param maxAttempts 最大重试次数，不需要重试请填写0，如果填写null则无限重试
+ */
+public void submitTask(Runnable task, Integer maxAttempts)
+
+/**
+ * 提交任务
+ *
+ * @param task        任务
+ * @param maxAttempts 最大重试次数，不需要重试请填写0，如果填写null则无限重试
+ * @param sleepMillis 每次重试间隔毫秒数，如果为null则每次重试间隔1000毫秒
+ */
+public void submitTask(Runnable task, Integer maxAttempts, Integer sleepMillis)
+```
+
 # 测试代码
 ```java
 import cn.hutool.core.thread.ThreadUtil;

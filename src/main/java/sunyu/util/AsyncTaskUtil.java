@@ -87,7 +87,7 @@ public class AsyncTaskUtil implements AutoCloseable {
      * @param task
      */
     public void submitTask(Runnable task) {
-        submitTask(task, null, null);
+        submitTask(task, 0, null);
     }
 
     /**
