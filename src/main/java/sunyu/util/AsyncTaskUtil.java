@@ -1,13 +1,13 @@
 package sunyu.util;
 
-import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.thread.ThreadUtil;
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Map;
+import java.util.concurrent.*;
+import java.util.function.Consumer;
 
 /**
  * 异步任务工具类
@@ -24,16 +24,20 @@ public class AsyncTaskUtil implements AutoCloseable {
 
     private AsyncTaskUtil(Config config) {
         log.info("[构建AsyncTaskUtil] 开始");
-        config.executor = Executors.newFixedThreadPool(config.maxConcurrency);
-        config.countLatchUtil = CountLatchUtil.builder().setMaxCount(config.maxConcurrency).build();
+        // 创建有界队列线程池（队列容量=并发数）
+        config.executor = new ThreadPoolExecutor(config.maxConcurrency, config.maxConcurrency, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(config.maxConcurrency * 2), (r, e) -> {
+            try {
+                e.getQueue().put(r); // 阻塞式入队
+            } catch (InterruptedException ignored) {
+            }
+        });
         log.info("[构建AsyncTaskUtil] 结束");
         this.config = config;
     }
 
     private static class Config {
         private ExecutorService executor;
-        private CountLatchUtil countLatchUtil;
-
+        private final Map<String, CompletableFuture<?>> completableFutureMap = new ConcurrentHashMap<>();
         private Integer maxConcurrency = 10;
     }
 
@@ -73,64 +77,66 @@ public class AsyncTaskUtil implements AutoCloseable {
     }
 
     /**
-     * 获取当前任务数
+     * 提交异步任务
      *
-     * @return 当前任务数量
-     */
-    public int getCount() {
-        return config.countLatchUtil.getCount();
-    }
-
-    /**
-     * 提交任务
-     *
-     * @param task
+     * @param task 需要执行的任务逻辑
      */
     public void submitTask(Runnable task) {
-        submitTask(task, 0, null);
+        submitTask(task, null);
     }
 
     /**
-     * 提交任务
+     * 提交异步任务
      *
-     * @param task        任务
-     * @param maxAttempts 最大重试次数，不需要重试请填写0，如果填写null则无限重试
+     * @param task             需要执行的任务逻辑
+     * @param exceptionHandler 异常处理回调
      */
-    public void submitTask(Runnable task, Integer maxAttempts) {
-        submitTask(task, maxAttempts, null);
+    public void submitTask(Runnable task, Consumer<Throwable> exceptionHandler) {
+        submitTask(task, exceptionHandler, new RetryLogic(0));
     }
 
     /**
-     * 提交任务
+     * 提交异步任务
      *
-     * @param task        任务
-     * @param maxAttempts 最大重试次数，不需要重试请填写0，如果填写null则无限重试
-     * @param sleepMillis 每次重试间隔毫秒数，如果为null则每次重试间隔1000毫秒
+     * @param task             需要执行的任务逻辑
+     * @param exceptionHandler 异常处理回调
+     * @param retryLogic       重试逻辑
      */
-    public void submitTask(Runnable task, Integer maxAttempts, Integer sleepMillis) {
-        config.countLatchUtil.countUp();//任务开始前，计数器加一
-        AtomicReference<String> err = new AtomicReference<>();
-        config.executor.submit(() -> {
-            int attempts = 0;
-            do {
+    public void submitTask(Runnable task, Consumer<Throwable> exceptionHandler, RetryLogic retryLogic) {
+        String taskId = IdUtil.simpleUUID();
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        config.completableFutureMap.put(taskId, future);
+        CompletableFuture.runAsync(() -> {
+            int retryCount = 0;
+            while (true) {
                 try {
                     task.run();
                     break;
                 } catch (Exception e) {
-                    err.set(ExceptionUtil.stacktraceToString(e));
-                    attempts++;
-                    log.warn("[重试] 第 {} 次", attempts);
-                    if (sleepMillis != null) {
-                        ThreadUtil.sleep(sleepMillis);
+                    if (retryLogic == null) {
+                        log.warn("[任务执行失败] 等待 10s 后进行无限重试");
+                        ThreadUtil.sleep(1000 * 10);
                     } else {
-                        ThreadUtil.sleep(1000);
+                        if (retryLogic.getRetry() < ++retryCount) {
+                            throw new RuntimeException(e);
+                        } else {
+                            log.warn("[任务执行失败] 等待 {}ms 后进行第 {} 次重试", retryLogic.getWaitTime(), retryCount);
+                            ThreadUtil.sleep(retryLogic.getWaitTime());
+                        }
                     }
                 }
-            } while (maxAttempts == null || attempts < maxAttempts);
-            config.countLatchUtil.countDown();//任务完成，计数器减一
-            if (err.get() != null) {
-                log.error("[任务执行失败] {}", err.get());
             }
+        }, config.executor).exceptionally(throwable -> {
+            if (throwable != null) {
+                if (exceptionHandler != null) {
+                    exceptionHandler.accept(throwable.getCause());
+                }
+            }
+            return null;
+        }).whenComplete((unused, throwable) -> {
+            config.completableFutureMap.remove(taskId);
+        }).whenComplete((unused, throwable) -> {
+            future.complete(null);
         });
     }
 
@@ -138,7 +144,16 @@ public class AsyncTaskUtil implements AutoCloseable {
      * 等待所有任务完成
      */
     public void awaitAllTasks() {
-        config.countLatchUtil.await();
+        CompletableFuture.allOf(config.completableFutureMap.values().toArray(new CompletableFuture[0])).join();
+    }
+
+    /**
+     * 获得正在执行或等待中的异步任务数量
+     *
+     * @return 未完成的任务数量
+     */
+    public int getPendingTaskCount() {
+        return config.completableFutureMap.size();
     }
 
 }
