@@ -9,6 +9,7 @@
     <artifactId>util-async-task</artifactId>
     <!-- {util.version}_{jdk.version}_{architecture.version} -->
     <version>1.0_jdk8_x64</version>
+    <classifier>shaded</classifier>
 </dependency>
 ```
 
