@@ -23,15 +23,20 @@ public class AsyncTaskUtil implements AutoCloseable {
     }
 
     private AsyncTaskUtil(Config config) {
-        log.info("[构建AsyncTaskUtil] 开始");
-        // 创建有界队列线程池（队列容量=并发数）
-        config.executor = new ThreadPoolExecutor(config.maxConcurrency, config.maxConcurrency, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(config.maxConcurrency * 2), (r, e) -> {
-            try {
-                e.getQueue().put(r); // 阻塞式入队
-            } catch (InterruptedException ignored) {
-            }
-        });
-        log.info("[构建AsyncTaskUtil] 结束");
+        log.info("[构建 {}] 开始", this.getClass().getSimpleName());
+        // 创建有界队列线程池（等待队列容量=并发数）
+        config.executor = new ThreadPoolExecutor(config.maxConcurrency, config.maxConcurrency,
+                0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(config.maxConcurrency),
+                (r, e) -> {
+                    try {
+                        e.getQueue().put(r); // 阻塞式入队
+                    } catch (InterruptedException ignored) {
+                        // 被中断时恢复中断状态并继续重试
+                        Thread.currentThread().interrupt();
+                        log.warn("任务提交被中断，重试中...");
+                    }
+                });
+        log.info("[构建 {}] 结束", this.getClass().getSimpleName());
         this.config = config;
     }
 
@@ -57,6 +62,7 @@ public class AsyncTaskUtil implements AutoCloseable {
          * 设置最大并发数
          *
          * @param maxConcurrency 最大并发数，默认10
+         *
          * @return 工具实例
          */
         public Builder setMaxConcurrency(int maxConcurrency) {
@@ -70,10 +76,10 @@ public class AsyncTaskUtil implements AutoCloseable {
      */
     @Override
     public void close() {
-        log.info("[销毁AsyncTaskUtil] 开始");
+        log.info("[销毁 {}] 开始", this.getClass().getSimpleName());
         awaitAllTasks();
         config.executor.shutdown();
-        log.info("[销毁AsyncTaskUtil] 结束");
+        log.info("[销毁 {}] 结束", this.getClass().getSimpleName());
     }
 
     /**
@@ -106,38 +112,41 @@ public class AsyncTaskUtil implements AutoCloseable {
         String taskId = IdUtil.simpleUUID();
         CompletableFuture<Void> future = new CompletableFuture<>();
         config.completableFutureMap.put(taskId, future);
-        CompletableFuture.runAsync(() -> {
-            int retryCount = 0;
-            while (true) {
-                try {
-                    task.run();
-                    break;
-                } catch (Exception e) {
-                    if (retryLogic == null) {
-                        log.warn("[任务执行失败] 等待 10s 后进行无限重试");
-                        ThreadUtil.sleep(1000 * 10);
-                    } else {
-                        if (retryLogic.getRetry() < ++retryCount) {
-                            throw new RuntimeException(e);
-                        } else {
-                            log.warn("[任务执行失败] 等待 {}ms 后进行第 {} 次重试", retryLogic.getWaitTime(), retryCount);
-                            ThreadUtil.sleep(retryLogic.getWaitTime());
+        CompletableFuture
+                .runAsync(() -> {
+                    int retryCount = 0;
+                    while (true) {
+                        try {
+                            task.run();
+                            break;
+                        } catch (Exception e) {
+                            if (retryLogic == null) {
+                                log.warn("[任务执行失败] 等待 10s 后进行无限重试");
+                                ThreadUtil.sleep(1000 * 10);
+                            } else {
+                                if (retryLogic.getRetry() < ++retryCount) {
+                                    throw new RuntimeException(e);
+                                } else {
+                                    log.warn("[任务执行失败] 等待 {}ms 后进行第 {} 次重试", retryLogic.getWaitTime(), retryCount);
+                                    ThreadUtil.sleep(retryLogic.getWaitTime());
+                                }
+                            }
                         }
                     }
-                }
-            }
-        }, config.executor).exceptionally(throwable -> {
-            if (throwable != null) {
-                if (exceptionHandler != null) {
-                    exceptionHandler.accept(throwable.getCause());
-                }
-            }
-            return null;
-        }).whenComplete((unused, throwable) -> {
-            config.completableFutureMap.remove(taskId);
-        }).whenComplete((unused, throwable) -> {
-            future.complete(null);
-        });
+                }, config.executor)
+                .exceptionally(throwable -> {
+                    if (throwable != null) {
+                        if (exceptionHandler != null) {
+                            exceptionHandler.accept(throwable.getCause());
+                        } else {
+                            log.error(throwable.getCause());
+                        }
+                    }
+                    return null;
+                }).whenComplete((unused, throwable) -> {
+                    config.completableFutureMap.remove(taskId);
+                    future.complete(null);
+                });
     }
 
     /**

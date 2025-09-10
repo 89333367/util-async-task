@@ -1,7 +1,18 @@
 package sunyu.util;
 
+/**
+ * 重试逻辑
+ *
+ * @author SunYu
+ */
 public class RetryLogic {
+    /**
+     * 重试次数
+     */
     private int retry = 3;
+    /**
+     * 重试间隔时间，单位：毫秒
+     */
     private int waitTime = 1000 * 10;
 
     /**
