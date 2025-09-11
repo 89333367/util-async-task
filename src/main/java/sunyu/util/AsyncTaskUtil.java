@@ -43,7 +43,18 @@ public class AsyncTaskUtil implements AutoCloseable {
     private static class Config {
         private ExecutorService executor;
         private final Map<String, CompletableFuture<?>> completableFutureMap = new ConcurrentHashMap<>();
+        /**
+         * 最大并发数，默认10
+         */
         private Integer maxConcurrency = 10;
+        /**
+         * 重试间隔时间，单位：毫秒
+         */
+        private final int waitTime = 1000 * 10;
+        /**
+         * 默认重试逻辑，不重试
+         */
+        private final RetryLogic defaultRetryLogic = new RetryLogic(0);
     }
 
     public static class Builder {
@@ -98,7 +109,7 @@ public class AsyncTaskUtil implements AutoCloseable {
      * @param exceptionHandler 异常处理回调
      */
     public void submitTask(Runnable task, Consumer<Throwable> exceptionHandler) {
-        submitTask(task, exceptionHandler, new RetryLogic(0));
+        submitTask(task, exceptionHandler, config.defaultRetryLogic);
     }
 
     /**
@@ -106,7 +117,7 @@ public class AsyncTaskUtil implements AutoCloseable {
      *
      * @param task             需要执行的任务逻辑
      * @param exceptionHandler 异常处理回调
-     * @param retryLogic       重试逻辑
+     * @param retryLogic       重试逻辑，如果为null则每隔10秒无限重试
      */
     public void submitTask(Runnable task, Consumer<Throwable> exceptionHandler, RetryLogic retryLogic) {
         String taskId = IdUtil.simpleUUID();
@@ -122,7 +133,7 @@ public class AsyncTaskUtil implements AutoCloseable {
                         } catch (Exception e) {
                             if (retryLogic == null) {
                                 log.warn("[任务执行失败] 等待 10s 后进行无限重试");
-                                ThreadUtil.sleep(1000 * 10);
+                                ThreadUtil.sleep(config.waitTime);
                             } else {
                                 if (retryLogic.getRetry() < ++retryCount) {
                                     throw new RuntimeException(e);
