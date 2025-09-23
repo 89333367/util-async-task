@@ -28,12 +28,13 @@ public class AsyncTaskUtil implements AutoCloseable {
         config.executor = new ThreadPoolExecutor(config.maxConcurrency, config.maxConcurrency,
                 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(config.maxConcurrency),
                 (r, e) -> {
-                    try {
-                        e.getQueue().put(r); // 阻塞式入队
-                    } catch (InterruptedException ignored) {
-                        // 被中断时恢复中断状态并继续重试
-                        Thread.currentThread().interrupt();
-                        log.warn("任务提交被中断，重试中...");
+                    while (true) {
+                        try {
+                            e.getQueue().put(r); // 阻塞式入队
+                            break;
+                        } catch (InterruptedException ignored) {
+                            log.warn("任务提交被中断，重试中...");
+                        }
                     }
                 });
         log.info("[构建 {}] 结束", this.getClass().getSimpleName());
@@ -132,11 +133,11 @@ public class AsyncTaskUtil implements AutoCloseable {
                             break;
                         } catch (Exception e) {
                             if (retryLogic == null) {
-                                log.warn("[任务执行失败] 等待 10s 后进行无限重试");
+                                log.warn("[任务执行失败] 等待 {}ms 后进行无限重试", config.waitTime);
                                 ThreadUtil.sleep(config.waitTime);
                             } else {
-                                if (retryLogic.getRetry() < ++retryCount) {
-                                    throw new RuntimeException(e);
+                                if (++retryCount > retryLogic.getRetry()) {
+                                    throw e;
                                 } else {
                                     log.warn("[任务执行失败] 等待 {}ms 后进行第 {} 次重试", retryLogic.getWaitTime(), retryCount);
                                     ThreadUtil.sleep(retryLogic.getWaitTime());
@@ -156,7 +157,11 @@ public class AsyncTaskUtil implements AutoCloseable {
                     return null;
                 }).whenComplete((unused, throwable) -> {
                     config.completableFutureMap.remove(taskId);
-                    future.complete(null);
+                    if (throwable != null) {
+                        future.completeExceptionally(throwable);
+                    } else {
+                        future.complete(null);
+                    }
                 });
     }
 
