@@ -1,13 +1,18 @@
 package sunyu.util;
 
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+
 import cn.hutool.core.thread.ThreadUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
-
-import java.util.Map;
-import java.util.concurrent.*;
-import java.util.function.Consumer;
 
 /**
  * 异步任务工具类

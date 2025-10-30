@@ -1,14 +1,15 @@
 package sunyu.util.test;
 
+import java.util.function.Consumer;
+
+import org.junit.jupiter.api.Test;
+
 import cn.hutool.core.thread.ThreadUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
-import org.junit.jupiter.api.Test;
 import sunyu.util.AsyncTaskUtil;
 import sunyu.util.RetryLogic;
-
-import java.util.function.Consumer;
 
 public class TestUtil {
     private final Log log = LogFactory.get();
@@ -76,7 +77,6 @@ public class TestUtil {
         asyncTaskUtil.close();//回收资源
     }
 
-
     @Test
     void t004() {
         AsyncTaskUtil asyncTaskUtil = AsyncTaskUtil.builder().setMaxConcurrency(10).build();//构建实例
@@ -97,6 +97,5 @@ public class TestUtil {
         asyncTaskUtil.awaitAllTasks();//等待所有异步任务完成
         asyncTaskUtil.close();//回收资源
     }
-
 
 }
