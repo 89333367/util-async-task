@@ -33,7 +33,7 @@ public class AsyncTaskUtil implements AutoCloseable {
         config.executor = new ThreadPoolExecutor(config.maxConcurrency, config.maxConcurrency,
                 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(config.maxConcurrency),
                 (r, e) -> {
-                    while (true) {
+                    while (true) {//死循环，直到成功入队
                         try {
                             e.getQueue().put(r); // 阻塞式入队
                             break;
