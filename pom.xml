@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>sunyu.util</groupId>
@@ -38,7 +38,6 @@
             <version>5.8.41</version>
         </dependency>
 
-
         <!-- https://central.sonatype.com/artifact/org.junit.jupiter/junit-jupiter/versions -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -63,13 +62,14 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <!-- 添加以下配置来禁用 dependency-reduced-pom.xml 文件生成 -->
+                            <!-- 禁用 dependency-reduced-pom.xml 文件生成 -->
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <relocations>
-                                <!--<relocation>
-                                    <pattern>com.fasterxml.jackson</pattern>
-                                    <shadedPattern>shaded.com.fasterxml.jackson</shadedPattern>
-                                </relocation>-->
+                                <!-- 重命名Hutool包 -->
+                                <relocation>
+                                    <pattern>cn.hutool</pattern>
+                                    <shadedPattern>sunyu.util.shaded.cn.hutool</shadedPattern>
+                                </relocation>
                             </relocations>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>shaded</shadedClassifierName>
@@ -81,7 +81,9 @@
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
-                                        <!-- 可选：保留其他静态资源，必要时再按需排除 -->
+                                        <!-- 排除重复的NOTICE文件 -->
+                                        <exclude>META-INF/NOTICE*</exclude>
+                                        <exclude>META-INF/LICENSE*</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
