@@ -68,7 +68,7 @@
                                 <!-- 重命名Hutool包 -->
                                 <relocation>
                                     <pattern>cn.hutool</pattern>
-                                    <shadedPattern>sunyu.util.shaded.cn.hutool</shadedPattern>
+                                    <shadedPattern>sunyu.util.relocations.async.task.cn.hutool</shadedPattern>
                                 </relocation>
                             </relocations>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
