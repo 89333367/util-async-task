@@ -7,8 +7,8 @@
 <dependency>
     <groupId>sunyu.util</groupId>
     <artifactId>util-async-task</artifactId>
-    <!-- {util.version}_{jdk.version}_{architecture.version} -->
-    <version>1.0_jdk8_x64</version>
+    <!-- {util.version}_{jdk.version} -->
+    <version>2.0_jdk8</version>
     <classifier>shaded</classifier>
 </dependency>
 ```
